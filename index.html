@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>لوحة المحتوى الاقتصادي</title>
+<style>
+/* RESET & BASE */
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#fafafa;--surface:#fff;--border:#e5e5e5;
+  --text:#1a1a1a;--text2:#666;--accent:#0c4a6e;
+  --accent-light:#e0f2fe;--green:#16a34a;--red:#dc2626;
+  --radius:8px;--shadow:0 1px 3px rgba(0,0,0,.06);
+}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;min-height:100vh}
+a{color:inherit;text-decoration:none}
+
+/* HEADER */
+.header{background:var(--surface);border-bottom:1px solid var(--border);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
+.header h1{font-size:1.25rem;font-weight:700;color:var(--accent)}
+.header-actions{display:flex;align-items:center;gap:12px}
+.last-update{font-size:.75rem;color:var(--text2)}
+.btn-refresh{background:var(--accent);color:#fff;border:none;padding:8px 16px;border-radius:var(--radius);cursor:pointer;font-size:.85rem;font-family:inherit;display:flex;align-items:center;gap:6px;transition:opacity .2s}
+.btn-refresh:hover{opacity:.85}
+.btn-refresh:disabled{opacity:.5;cursor:not-allowed}
+.btn-refresh svg{width:16px;height:16px}
+.spinner{animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* TICKER */
+.ticker{display:flex;gap:16px;padding:12px 24px;background:var(--surface);border-bottom:1px solid var(--border);overflow-x:auto}
+.ticker-item{display:flex;align-items:center;gap:8px;padding:8px 16px;background:var(--bg);border-radius:var(--radius);white-space:nowrap;min-width:fit-content}
+.ticker-label{font-size:.8rem;color:var(--text2)}
+.ticker-value{font-size:1rem;font-weight:700}
+.ticker-change{font-size:.75rem;padding:2px 6px;border-radius:4px}
+.up{color:var(--green);background:#dcfce7}
+.down{color:var(--red);background:#fee2e2}
+
+/* TABS */
+.tabs{display:flex;gap:4px;padding:12px 24px;background:var(--surface);border-bottom:1px solid var(--border);overflow-x:auto}
+.tab{padding:6px 14px;border-radius:20px;font-size:.85rem;cursor:pointer;white-space:nowrap;border:1px solid transparent;transition:all .2s;color:var(--text2)}
+.tab:hover{background:var(--accent-light)}
+.tab.active{background:var(--accent);color:#fff}
+
+/* MAIN */
+.main{max-width:900px;margin:0 auto;padding:16px 24px}
+.section{display:none}
+.section.active{display:block}
+.section-title{font-size:.9rem;color:var(--text2);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+
+/* CARDS */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px;transition:border-color .2s;cursor:pointer}
+.card:hover{border-color:var(--accent)}
+.card-source{font-size:.7rem;color:var(--accent);font-weight:600;margin-bottom:4px;display:flex;align-items:center;gap:6px}
+.card-title{font-size:.95rem;font-weight:600;margin-bottom:6px;line-height:1.5}
+.card-desc{font-size:.82rem;color:var(--text2);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.card-time{font-size:.7rem;color:var(--text2);margin-top:6px}
+
+/* LOADING & EMPTY */
+.loading{text-align:center;padding:40px;color:var(--text2)}
+.loading-dots::after{content:'';animation:dots 1.5s steps(4) infinite}
+@keyframes dots{0%{content:''}25%{content:'.'}50%{content:'..'}75%{content:'...'}}
+.empty{text-align:center;padding:40px;color:var(--text2);font-size:.9rem}
+
+/* FOOTER */
+.footer{text-align:center;padding:16px;font-size:.7rem;color:var(--text2);border-top:1px solid var(--border);margin-top:24px}
+
+/* RESPONSIVE */
+@media(max-width:600px){
+  .header{padding:12px 16px}
+  .header h1{font-size:1.05rem}
+  .ticker{padding:10px 16px;gap:10px}
+  .tabs{padding:10px 16px}
+  .main{padding:12px 16px}
+}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <h1>لوحة المحتوى الاقتصادي</h1>
+  <div class="header-actions">
+    <span class="last-update" id="lastUpdate"></span>
+    <button class="btn-refresh" id="btnRefresh" onclick="refreshAll()">
+      <svg id="refreshIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/></svg>
+      تحديث
+    </button>
+  </div>
+</header>
+
+<div class="ticker" id="ticker">
+  <div class="ticker-item"><span class="ticker-label">جاري التحميل...</span></div>
+</div>
+
+<nav class="tabs" id="tabs">
+  <!-- filled by JS -->
+</nav>
+
+<main class="main" id="main">
+  <!-- filled by JS -->
+</main>
+
+<footer class="footer">
+  لوحة المحتوى الاقتصادي &mdash; تحديث تلقائي كل 24 ساعة &mdash; المصادر: أرقام، الشرق بلومبرغ، اندبندنت عربية، CNBC عربية، صحيفة مال، وغيرها
+</footer>
+
+<script>
+// ========== CONFIGURATION ==========
+const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
+const CACHE_KEY = 'econ_dash_cache';
+const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+
+const CATEGORIES = [
+  { id: 'all', label: 'الكل' },
+  { id: 'economy', label: 'اقتصاد' },
+  { id: 'markets', label: 'أسواق ومال' },
+  { id: 'realestate', label: 'عقارات' },
+  { id: 'fintech', label: 'تقنية مالية' },
+  { id: 'startups', label: 'ريادة واستثمار' },
+  { id: 'crypto', label: 'عملات رقمية' },
+];
+
+const FEEDS = [
+  // Economy & General
+  { url: 'https://www.argaam.com/ar/rss/articles', source: 'أرقام', cat: 'economy' },
+  { url: 'https://www.independentarabia.com/rss/economy', source: 'اندبندنت عربية', cat: 'economy' },
+  { url: 'https://makkahnewspaper.com/rss/economy', source: 'صحيفة مكة - اقتصاد', cat: 'economy' },
+  // Markets & Finance
+  { url: 'https://www.mubasher.info/rss', source: 'مباشر', cat: 'markets' },
+  { url: 'https://maaal.com/feed/', source: 'صحيفة مال', cat: 'markets' },
+  // Real Estate
+  { url: 'https://www.amlakalarab.com/feed/', source: 'أملاك العرب', cat: 'realestate' },
+  // Fintech
+  { url: 'https://fintechmagic.com/feed/', source: 'فنتك ماجيك', cat: 'fintech' },
+  { url: 'https://www.fintechnews.org/feed/', source: 'Fintech News', cat: 'fintech' },
+  // Startups & VC
+  { url: 'https://www.wamda.com/ar/feed', source: 'ومضة', cat: 'startups' },
+  // Crypto
+  { url: 'https://ar.cointelegraph.com/rss', source: 'كوين تلغراف عربي', cat: 'crypto' },
+];
+
+let allArticles = [];
+let activeTab = 'all';
+
+// ========== RSS PARSING ==========
+function parseRSS(xmlText, source, cat) {
+  const articles = [];
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xmlText, 'text/xml');
+    // Try RSS <item> or Atom <entry>
+    let items = doc.querySelectorAll('item');
+    if (!items.length) items = doc.querySelectorAll('entry');
+    items.forEach((item, i) => {
+      if (i >= 12) return; // limit per source
+      const title = item.querySelector('title')?.textContent?.trim() || '';
+      const link = item.querySelector('link')?.textContent?.trim()
+        || item.querySelector('link')?.getAttribute('href') || '';
+      const desc = item.querySelector('description')?.textContent?.trim()
+        || item.querySelector('summary')?.textContent?.trim() || '';
+      const pubDate = item.querySelector('pubDate')?.textContent
+        || item.querySelector('published')?.textContent
+        || item.querySelector('dc\\:date, date')?.textContent || '';
+      // Strip HTML from description
+      const cleanDesc = desc.replace(/<[^>]*>/g, '').substring(0, 200);
+      if (title) {
+        articles.push({ title, link, desc: cleanDesc, source, cat, date: pubDate ? new Date(pubDate) : new Date() });
+      }
+    });
+  } catch (e) {
+    console.warn('Parse error for ' + source, e);
+  }
+  return articles;
+}
+
+async function fetchFeed(feed) {
+  try {
+    const url = CORS_PROXY + encodeURIComponent(feed.url);
+    const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    if (!resp.ok) return [];
+    const text = await resp.text();
+    return parseRSS(text, feed.source, feed.cat);
+  } catch (e) {
+    console.warn('Fetch failed: ' + feed.source, e);
+    return [];
+  }
+}
+
+// ========== PRICES ==========
+async function fetchPrices() {
+  const prices = { btc: null, gold: null, oil: null };
+  try {
+    // BTC from CoinGecko
+    const btcResp = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true', { signal: AbortSignal.timeout(8000) });
+    if (btcResp.ok) {
+      const btcData = await btcResp.json();
+      prices.btc = {
+        value: btcData.bitcoin.usd,
+        change: btcData.bitcoin.usd_24h_change
+      };
+    }
+  } catch(e) { console.warn('BTC price fetch failed', e); }
+  try {
+    // Gold from metals API (free tier) - fallback to static display
+    const goldResp = await fetch('https://api.metals.dev/v1/latest?api_key=demo&currency=USD&unit=toz', { signal: AbortSignal.timeout(8000) });
+    if (goldResp.ok) {
+      const goldData = await goldResp.json();
+      if (goldData.metals && goldData.metals.gold) {
+        prices.gold = { value: goldData.metals.gold, change: null };
+      }
+    }
+  } catch(e) { console.warn('Gold price fetch failed', e); }
+  return prices;
+}
+
+// ========== RENDERING ==========
+function renderTicker(prices) {
+  const el = document.getElementById('ticker');
+  let html = '';
+  if (prices.btc) {
+    const dir = prices.btc.change >= 0 ? 'up' : 'down';
+    html += `<div class="ticker-item">
+      <span class="ticker-label">بتكوين</span>
+      <span class="ticker-value">$${Number(prices.btc.value).toLocaleString('en', {maximumFractionDigits:0})}</span>
+      <span class="ticker-change ${dir}">${prices.btc.change >= 0 ? '+' : ''}${prices.btc.change.toFixed(1)}%</span>
+    </div>`;
+  }
+  if (prices.gold) {
+    html += `<div class="ticker-item">
+      <span class="ticker-label">الذهب (أونصة)</span>
+      <span class="ticker-value">$${Number(prices.gold.value).toLocaleString('en', {maximumFractionDigits:0})}</span>
+      ${prices.gold.change !== null ? `<span class="ticker-change ${prices.gold.change >= 0 ? 'up' : 'down'}">${prices.gold.change >= 0 ? '+' : ''}${prices.gold.change.toFixed(1)}%</span>` : ''}
+    </div>`;
+  }
+  if (!html) html = '<div class="ticker-item"><span class="ticker-label">تعذّر تحميل الأسعار</span></div>';
+  el.innerHTML = html;
+}
+
+function renderTabs() {
+  const el = document.getElementById('tabs');
+  el.innerHTML = CATEGORIES.map(c =>
+    `<div class="tab ${c.id === activeTab ? 'active' : ''}" onclick="switchTab('${c.id}')">${c.label}</div>`
+  ).join('');
+}
+
+function timeAgo(date) {
+  if (!date || isNaN(date)) return '';
+  const diff = Date.now() - date.getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'الآن';
+  if (mins < 60) return `منذ ${mins} د`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `منذ ${hrs} س`;
+  const days = Math.floor(hrs / 24);
+  return `منذ ${days} ي`;
+}
+
+function renderArticles() {
+  const el = document.getElementById('main');
+  const filtered = activeTab === 'all' ? allArticles : allArticles.filter(a => a.cat === activeTab);
+  if (!filtered.length) {
+    el.innerHTML = '<div class="empty">لا توجد أخبار في هذا القسم حالياً</div>';
+    return;
+  }
+  el.innerHTML = filtered.map(a => `
+    <a class="card" href="${a.link}" target="_blank" rel="noopener">
+      <div class="card-source">${a.source}</div>
+      <div class="card-title">${a.title}</div>
+      ${a.desc ? `<div class="card-desc">${a.desc}</div>` : ''}
+      <div class="card-time">${timeAgo(a.date)}</div>
+    </a>
+  `).join('');
+}
+
+function switchTab(id) {
+  activeTab = id;
+  renderTabs();
+  renderArticles();
+}
+
+// ========== CACHE ==========
+function saveCache(data) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({
+      ts: Date.now(),
+      articles: data.articles,
+      prices: data.prices
+    }));
+  } catch(e) {}
+}
+
+function loadCache() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (Date.now() - data.ts > CACHE_TTL) return null;
+    // Restore date objects
+    data.articles = data.articles.map(a => ({ ...a, date: new Date(a.date) }));
+    return data;
+  } catch(e) { return null; }
+}
+
+// ========== MAIN ==========
+function setLoading(on) {
+  const btn = document.getElementById('btnRefresh');
+  const icon = document.getElementById('refreshIcon');
+  btn.disabled = on;
+  if (on) icon.classList.add('spinner');
+  else icon.classList.remove('spinner');
+  if (on) {
+    document.getElementById('main').innerHTML = '<div class="loading">جاري تحميل الأخبار<span class="loading-dots"></span></div>';
+  }
+}
+
+function updateTimestamp(ts) {
+  const d = new Date(ts);
+  document.getElementById('lastUpdate').textContent =
+    'آخر تحديث: ' + d.toLocaleString('ar-EG', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' });
+}
+
+async function refreshAll(force) {
+  if (!force) {
+    const cached = loadCache();
+    if (cached) {
+      allArticles = cached.articles;
+      renderTicker(cached.prices);
+      renderTabs();
+      renderArticles();
+      updateTimestamp(cached.ts);
+      return;
+    }
+  }
+  setLoading(true);
+
+  // Fetch all feeds in parallel
+  const [feedResults, prices] = await Promise.all([
+    Promise.all(FEEDS.map(f => fetchFeed(f))),
+    fetchPrices()
+  ]);
+
+  allArticles = feedResults.flat();
+  // Sort by date, newest first
+  allArticles.sort((a, b) => b.date - a.date);
+
+  renderTicker(prices);
+  renderTabs();
+  renderArticles();
+
+  const ts = Date.now();
+  updateTimestamp(ts);
+  saveCache({ articles: allArticles, prices });
+  setLoading(false);
+}
+
+// Button handler - always force refresh
+document.getElementById('btnRefresh').onclick = () => refreshAll(true);
+
+// Auto-refresh check every hour
+setInterval(() => {
+  const cached = loadCache();
+  if (!cached) refreshAll(true);
+}, 60 * 60 * 1000);
+
+// Init
+renderTabs();
+refreshAll();
+</script>
+</body>
+</html>
