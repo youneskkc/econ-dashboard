@@ -102,46 +102,44 @@ a{color:inherit;text-decoration:none}
 </main>
 
 <footer class="footer">
-  لوحة المحتوى الاقتصادي &mdash; تحديث تلقائي كل 24 ساعة &mdash; المصادر: أرقام، الشرق بلومبرغ، اندبندنت عربية، CNBC عربية، صحيفة مال، وغيرها
+  لوحة المحتوى الاقتصادي &mdash; تحديث تلقائي كل 24 ساعة &mdash; المصادر: RT عربي، CNN الاقتصادية، الاقتصادية، الجزيرة، سكاي نيوز، البوابة التقنية، ومضة
 </footer>
 
 <script>
 // ========== CONFIGURATION ==========
-const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
-const CACHE_KEY = 'econ_dash_cache';
-const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+// allorigins /get returns JSON: { contents: "...xml..." }
+const PROXY = 'https://api.allorigins.win/get?url=';
+const CACHE_KEY = 'econ_dash_v2';
+const CACHE_TTL = 24 * 60 * 60 * 1000;
 
 const CATEGORIES = [
   { id: 'all', label: 'الكل' },
   { id: 'economy', label: 'اقتصاد' },
   { id: 'markets', label: 'أسواق ومال' },
-  { id: 'realestate', label: 'عقارات' },
-  { id: 'fintech', label: 'تقنية مالية' },
+  { id: 'tech', label: 'تقنية مالية' },
   { id: 'startups', label: 'ريادة واستثمار' },
-  { id: 'crypto', label: 'عملات رقمية' },
 ];
 
+// Verified working RSS feeds (tested 2024)
 const FEEDS = [
-  // Economy & General
-  { url: 'https://www.argaam.com/ar/rss/articles', source: 'أرقام', cat: 'economy' },
-  { url: 'https://www.independentarabia.com/rss/economy', source: 'اندبندنت عربية', cat: 'economy' },
-  { url: 'https://makkahnewspaper.com/rss/economy', source: 'صحيفة مكة - اقتصاد', cat: 'economy' },
-  // Markets & Finance
-  { url: 'https://www.mubasher.info/rss', source: 'مباشر', cat: 'markets' },
-  { url: 'https://maaal.com/feed/', source: 'صحيفة مال', cat: 'markets' },
-  // Real Estate
-  { url: 'https://www.amlakalarab.com/feed/', source: 'أملاك العرب', cat: 'realestate' },
-  // Fintech
-  { url: 'https://fintechmagic.com/feed/', source: 'فنتك ماجيك', cat: 'fintech' },
-  { url: 'https://www.fintechnews.org/feed/', source: 'Fintech News', cat: 'fintech' },
+  // Economy
+  { url: 'https://arabic.rt.com/rss/business/', source: 'RT عربي - مال وأعمال', cat: 'economy' },
+  { url: 'https://arabic.cnn.com/business/rss', source: 'CNN الاقتصادية', cat: 'economy' },
+  { url: 'https://www.aleqt.com/rss', source: 'الاقتصادية', cat: 'economy' },
+  // Markets & General
+  { url: 'https://www.aljazeera.net/rss', source: 'الجزيرة نت', cat: 'markets' },
+  { url: 'https://www.skynewsarabia.com/rss', source: 'سكاي نيوز عربية', cat: 'markets' },
+  // Tech & Fintech
+  { url: 'https://aitnews.com/feed/', source: 'البوابة التقنية', cat: 'tech' },
+  { url: 'https://economymiddleeast.com/category/technology/feed/', source: 'Economy ME - تقنية', cat: 'tech' },
   // Startups & VC
-  { url: 'https://www.wamda.com/ar/feed', source: 'ومضة', cat: 'startups' },
-  // Crypto
-  { url: 'https://ar.cointelegraph.com/rss', source: 'كوين تلغراف عربي', cat: 'crypto' },
+  { url: 'https://www.wamda.com/feed', source: 'ومضة', cat: 'startups' },
+  { url: 'https://economymiddleeast.com/category/finance/feed/', source: 'Economy ME - تمويل', cat: 'startups' },
 ];
 
 let allArticles = [];
 let activeTab = 'all';
+let feedStatus = {};
 
 // ========== RSS PARSING ==========
 function parseRSS(xmlText, source, cat) {
@@ -149,68 +147,63 @@ function parseRSS(xmlText, source, cat) {
   try {
     const parser = new DOMParser();
     const doc = parser.parseFromString(xmlText, 'text/xml');
-    // Try RSS <item> or Atom <entry>
+    if (doc.querySelector('parsererror')) return articles;
     let items = doc.querySelectorAll('item');
     if (!items.length) items = doc.querySelectorAll('entry');
     items.forEach((item, i) => {
-      if (i >= 12) return; // limit per source
+      if (i >= 10) return;
       const title = item.querySelector('title')?.textContent?.trim() || '';
-      const link = item.querySelector('link')?.textContent?.trim()
-        || item.querySelector('link')?.getAttribute('href') || '';
+      // Handle both text content and href attribute for links
+      let link = '';
+      const linkEl = item.querySelector('link');
+      if (linkEl) {
+        link = linkEl.textContent?.trim() || linkEl.getAttribute('href') || '';
+      }
       const desc = item.querySelector('description')?.textContent?.trim()
-        || item.querySelector('summary')?.textContent?.trim() || '';
+        || item.querySelector('summary')?.textContent?.trim()
+        || item.querySelector('content')?.textContent?.trim() || '';
       const pubDate = item.querySelector('pubDate')?.textContent
         || item.querySelector('published')?.textContent
-        || item.querySelector('dc\\:date, date')?.textContent || '';
-      // Strip HTML from description
-      const cleanDesc = desc.replace(/<[^>]*>/g, '').substring(0, 200);
-      if (title) {
+        || item.querySelector('updated')?.textContent || '';
+      const cleanDesc = desc.replace(/<[^>]*>/g, '').replace(/&[^;]+;/g, ' ').substring(0, 200).trim();
+      if (title && title.length > 5) {
         articles.push({ title, link, desc: cleanDesc, source, cat, date: pubDate ? new Date(pubDate) : new Date() });
       }
     });
   } catch (e) {
-    console.warn('Parse error for ' + source, e);
+    console.warn('Parse error:', source, e);
   }
   return articles;
 }
 
 async function fetchFeed(feed) {
   try {
-    const url = CORS_PROXY + encodeURIComponent(feed.url);
-    const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
-    if (!resp.ok) return [];
-    const text = await resp.text();
-    return parseRSS(text, feed.source, feed.cat);
+    const url = PROXY + encodeURIComponent(feed.url);
+    const resp = await fetch(url, { signal: AbortSignal.timeout(12000) });
+    if (!resp.ok) { feedStatus[feed.source] = 'err'; return []; }
+    const json = await resp.json();
+    if (!json.contents) { feedStatus[feed.source] = 'empty'; return []; }
+    const articles = parseRSS(json.contents, feed.source, feed.cat);
+    feedStatus[feed.source] = articles.length > 0 ? 'ok' : 'no-items';
+    return articles;
   } catch (e) {
-    console.warn('Fetch failed: ' + feed.source, e);
+    feedStatus[feed.source] = 'timeout';
+    console.warn('Fetch failed:', feed.source, e.message);
     return [];
   }
 }
 
 // ========== PRICES ==========
 async function fetchPrices() {
-  const prices = { btc: null, gold: null, oil: null };
+  const prices = { btc: null, gold: null };
   try {
-    // BTC from CoinGecko
-    const btcResp = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true', { signal: AbortSignal.timeout(8000) });
-    if (btcResp.ok) {
-      const btcData = await btcResp.json();
-      prices.btc = {
-        value: btcData.bitcoin.usd,
-        change: btcData.bitcoin.usd_24h_change
-      };
+    const r = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,tether-gold&vs_currencies=usd&include_24hr_change=true', { signal: AbortSignal.timeout(8000) });
+    if (r.ok) {
+      const d = await r.json();
+      if (d.bitcoin) prices.btc = { value: d.bitcoin.usd, change: d.bitcoin.usd_24h_change };
+      if (d['tether-gold']) prices.gold = { value: d['tether-gold'].usd, change: d['tether-gold'].usd_24h_change };
     }
-  } catch(e) { console.warn('BTC price fetch failed', e); }
-  try {
-    // Gold from metals API (free tier) - fallback to static display
-    const goldResp = await fetch('https://api.metals.dev/v1/latest?api_key=demo&currency=USD&unit=toz', { signal: AbortSignal.timeout(8000) });
-    if (goldResp.ok) {
-      const goldData = await goldResp.json();
-      if (goldData.metals && goldData.metals.gold) {
-        prices.gold = { value: goldData.metals.gold, change: null };
-      }
-    }
-  } catch(e) { console.warn('Gold price fetch failed', e); }
+  } catch(e) { console.warn('Price fetch failed', e); }
   return prices;
 }
 
@@ -222,43 +215,49 @@ function renderTicker(prices) {
     const dir = prices.btc.change >= 0 ? 'up' : 'down';
     html += `<div class="ticker-item">
       <span class="ticker-label">بتكوين</span>
-      <span class="ticker-value">$${Number(prices.btc.value).toLocaleString('en', {maximumFractionDigits:0})}</span>
-      <span class="ticker-change ${dir}">${prices.btc.change >= 0 ? '+' : ''}${prices.btc.change.toFixed(1)}%</span>
+      <span class="ticker-value">$${Number(prices.btc.value).toLocaleString('en',{maximumFractionDigits:0})}</span>
+      <span class="ticker-change ${dir}">${prices.btc.change>=0?'+':''}${prices.btc.change.toFixed(1)}%</span>
     </div>`;
   }
   if (prices.gold) {
+    const dir = prices.gold.change >= 0 ? 'up' : 'down';
     html += `<div class="ticker-item">
-      <span class="ticker-label">الذهب (أونصة)</span>
-      <span class="ticker-value">$${Number(prices.gold.value).toLocaleString('en', {maximumFractionDigits:0})}</span>
-      ${prices.gold.change !== null ? `<span class="ticker-change ${prices.gold.change >= 0 ? 'up' : 'down'}">${prices.gold.change >= 0 ? '+' : ''}${prices.gold.change.toFixed(1)}%</span>` : ''}
+      <span class="ticker-label">الذهب</span>
+      <span class="ticker-value">$${Number(prices.gold.value).toLocaleString('en',{maximumFractionDigits:0})}</span>
+      <span class="ticker-change ${dir}">${prices.gold.change>=0?'+':''}${prices.gold.change.toFixed(1)}%</span>
     </div>`;
   }
-  if (!html) html = '<div class="ticker-item"><span class="ticker-label">تعذّر تحميل الأسعار</span></div>';
+  // Source status counter
+  const ok = Object.values(feedStatus).filter(s=>s==='ok').length;
+  const total = FEEDS.length;
+  html += `<div class="ticker-item"><span class="ticker-label">مصادر نشطة</span><span class="ticker-value">${ok}/${total}</span></div>`;
+  if (!prices.btc && !prices.gold) html = '<div class="ticker-item"><span class="ticker-label">جاري تحميل الأسعار...</span></div>' + html;
   el.innerHTML = html;
 }
 
 function renderTabs() {
   const el = document.getElementById('tabs');
-  el.innerHTML = CATEGORIES.map(c =>
-    `<div class="tab ${c.id === activeTab ? 'active' : ''}" onclick="switchTab('${c.id}')">${c.label}</div>`
-  ).join('');
+  el.innerHTML = CATEGORIES.map(c => {
+    const count = c.id === 'all' ? allArticles.length : allArticles.filter(a=>a.cat===c.id).length;
+    return `<div class="tab ${c.id===activeTab?'active':''}" onclick="switchTab('${c.id}')">${c.label} <small>(${count})</small></div>`;
+  }).join('');
 }
 
 function timeAgo(date) {
   if (!date || isNaN(date)) return '';
   const diff = Date.now() - date.getTime();
-  const mins = Math.floor(diff / 60000);
+  const mins = Math.floor(diff/60000);
   if (mins < 1) return 'الآن';
-  if (mins < 60) return `منذ ${mins} د`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `منذ ${hrs} س`;
-  const days = Math.floor(hrs / 24);
-  return `منذ ${days} ي`;
+  if (mins < 60) return 'منذ ' + mins + ' د';
+  const hrs = Math.floor(mins/60);
+  if (hrs < 24) return 'منذ ' + hrs + ' س';
+  const days = Math.floor(hrs/24);
+  return 'منذ ' + days + ' يوم';
 }
 
 function renderArticles() {
   const el = document.getElementById('main');
-  const filtered = activeTab === 'all' ? allArticles : allArticles.filter(a => a.cat === activeTab);
+  const filtered = activeTab === 'all' ? allArticles : allArticles.filter(a=>a.cat===activeTab);
   if (!filtered.length) {
     el.innerHTML = '<div class="empty">لا توجد أخبار في هذا القسم حالياً</div>';
     return;
@@ -267,37 +266,25 @@ function renderArticles() {
     <a class="card" href="${a.link}" target="_blank" rel="noopener">
       <div class="card-source">${a.source}</div>
       <div class="card-title">${a.title}</div>
-      ${a.desc ? `<div class="card-desc">${a.desc}</div>` : ''}
+      ${a.desc ? '<div class="card-desc">'+a.desc+'</div>' : ''}
       <div class="card-time">${timeAgo(a.date)}</div>
     </a>
   `).join('');
 }
 
-function switchTab(id) {
-  activeTab = id;
-  renderTabs();
-  renderArticles();
-}
+function switchTab(id) { activeTab = id; renderTabs(); renderArticles(); }
 
 // ========== CACHE ==========
 function saveCache(data) {
-  try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({
-      ts: Date.now(),
-      articles: data.articles,
-      prices: data.prices
-    }));
-  } catch(e) {}
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), articles: data.articles, prices: data.prices })); } catch(e) {}
 }
-
 function loadCache() {
   try {
     const raw = localStorage.getItem(CACHE_KEY);
     if (!raw) return null;
     const data = JSON.parse(raw);
     if (Date.now() - data.ts > CACHE_TTL) return null;
-    // Restore date objects
-    data.articles = data.articles.map(a => ({ ...a, date: new Date(a.date) }));
+    data.articles = data.articles.map(a=>({...a, date: new Date(a.date)}));
     return data;
   } catch(e) { return null; }
 }
@@ -307,17 +294,13 @@ function setLoading(on) {
   const btn = document.getElementById('btnRefresh');
   const icon = document.getElementById('refreshIcon');
   btn.disabled = on;
-  if (on) icon.classList.add('spinner');
-  else icon.classList.remove('spinner');
-  if (on) {
-    document.getElementById('main').innerHTML = '<div class="loading">جاري تحميل الأخبار<span class="loading-dots"></span></div>';
-  }
+  on ? icon.classList.add('spinner') : icon.classList.remove('spinner');
+  if (on) document.getElementById('main').innerHTML = '<div class="loading">جاري تحميل الأخبار<span class="loading-dots"></span></div>';
 }
 
 function updateTimestamp(ts) {
   const d = new Date(ts);
-  document.getElementById('lastUpdate').textContent =
-    'آخر تحديث: ' + d.toLocaleString('ar-EG', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' });
+  document.getElementById('lastUpdate').textContent = 'آخر تحديث: ' + d.toLocaleString('ar-EG', { hour:'2-digit', minute:'2-digit', day:'numeric', month:'short' });
 }
 
 async function refreshAll(force) {
@@ -333,37 +316,26 @@ async function refreshAll(force) {
     }
   }
   setLoading(true);
-
-  // Fetch all feeds in parallel
+  feedStatus = {};
   const [feedResults, prices] = await Promise.all([
     Promise.all(FEEDS.map(f => fetchFeed(f))),
     fetchPrices()
   ]);
-
   allArticles = feedResults.flat();
-  // Sort by date, newest first
   allArticles.sort((a, b) => b.date - a.date);
-
   renderTicker(prices);
   renderTabs();
   renderArticles();
-
   const ts = Date.now();
   updateTimestamp(ts);
   saveCache({ articles: allArticles, prices });
   setLoading(false);
+  // Log status for debugging
+  console.table(feedStatus);
 }
 
-// Button handler - always force refresh
 document.getElementById('btnRefresh').onclick = () => refreshAll(true);
-
-// Auto-refresh check every hour
-setInterval(() => {
-  const cached = loadCache();
-  if (!cached) refreshAll(true);
-}, 60 * 60 * 1000);
-
-// Init
+setInterval(() => { if (!loadCache()) refreshAll(true); }, 60*60*1000);
 renderTabs();
 refreshAll();
 </script>
